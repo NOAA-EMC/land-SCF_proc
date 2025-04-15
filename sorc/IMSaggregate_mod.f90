@@ -203,7 +203,6 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
                 staids(i,j,t)=tile_str//xind//yind
 
                 ! convert string into integer
-
                 read(staids(i,j,t),'(i9)') stationid
                 sid(i,j,t)=stationid
 
@@ -443,7 +442,7 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
     error = nf90_put_att(ncid, id_oro, "long_name", "orography")
     call netcdf_err(error, 'defining oro long name' )
 
-    !--- define station identification ineter
+    !--- define station identification integer
     error = nf90_def_var(ncid, 'STAids', nf90_int, id_obs, id_idsSTA)
     call netcdf_err(error, 'defining STAids' )
     error = nf90_put_att(ncid, id_idsSTA, "long_name", "Station Identification")
