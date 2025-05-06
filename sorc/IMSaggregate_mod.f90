@@ -83,8 +83,8 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
         character(len=2)    :: jstr2,istr2
         character(len=3)    :: jstr3,istr3
         character(len=4)    :: xind, yind, jstr4,istr4
-        character(len=9)    :: staids(idim,jdim,6) ! station ID string
-        integer             :: sid(idim,jdim,6)    ! staiion ID integer
+        character(len=9)    :: stid(idim,jdim,6)   ! station ID string
+        integer             :: sid(idim,jdim,6)    ! station ID integer
         integer             :: i,j,t,stationid
         integer             :: time
 !=============================================================================================
@@ -200,10 +200,10 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
                   yind=jstr4
                 end if
 
-                staids(i,j,t)=tile_str//xind//yind
+                stid(i,j,t)=tile_str//xind//yind
 
                 ! convert string into integer
-                read(staids(i,j,t),'(i9)') stationid
+                read(stid(i,j,t),'(i9)') stationid
                 sid(i,j,t)=stationid
 
              enddo
