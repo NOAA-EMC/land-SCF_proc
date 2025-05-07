@@ -169,10 +169,10 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
            do i=1,idim
              do j=1,jdim
                 write(tile_str, '(i1)') t ! assuming <10 tiles.
-        ! create xindex string for final station identification
+                  ! create xindex string for final station identification
                   write(istr4,'(i4.4)') i
                   xind=istr4
-        ! create yindex string for final station identification
+                  ! create yindex string for final station identification
                   write(jstr4,'(i4.4)') j
                   yind=jstr4
 
@@ -181,7 +181,6 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
                 ! convert string into integer
                 read(stid(i,j,t),'(i9)') stationid
                 sid(i,j,t)=stationid
-
              enddo
            enddo
          enddo
