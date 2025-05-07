@@ -79,9 +79,7 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
         real                :: oroFV3(idim,jdim,6) ! orography model grid
         character(len=250)  :: IMS_obs_file
         character(len=8)    :: date_from_file
-        character(len=1)    :: tile_str,jstr1,istr1
-        character(len=2)    :: jstr2,istr2
-        character(len=3)    :: jstr3,istr3
+        character(len=1)    :: tile_str
         character(len=4)    :: xind, yind, jstr4,istr4
         character(len=9)    :: stid(idim,jdim,6)   ! station ID string
         integer             :: sid(idim,jdim,6)    ! station ID integer
@@ -172,33 +170,11 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
              do j=1,jdim
                 write(tile_str, '(i1)') t ! assuming <10 tiles.
         ! create xindex string for final station identification
-                if(i<=9) then
-                  write(istr1,'(i1)') i
-                  xind='000'//istr1
-                else if (i >= 10 .AND. i <= 99) then
-                  write(istr2,'(i2)') i
-                  xind='00'//istr2
-                else if (i >= 100 .AND. i <= 999) then
-                  write(istr3,'(i3)') i
-                  xind='0'//istr3
-                else
-                  write(istr4,'(i4)') i
+                  write(istr4,'(i4.4)') i
                   xind=istr4
-                end if
-         ! create yindex string for final station identification
-                if( j<= 9) then
-                  write(jstr1,'(i1)') j
-                  yind='000'//jstr1
-                else if (j >=10 .AND. j <= 99) then
-                  write(jstr2,'(i2)') j
-                  yind='00'//jstr2
-                else if (j >= 100 .AND. j <= 999) then
-                  write(jstr3,'(i3)') j
-                  yind='0'//jstr3
-                else
-                  write(jstr4,'(i4)') j
+        ! create yindex string for final station identification
+                  write(jstr4,'(i4.4)') j
                   yind=jstr4
-                end if
 
                 stid(i,j,t)=tile_str//xind//yind
 
@@ -443,12 +419,12 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
     call netcdf_err(error, 'defining oro long name' )
 
     !--- define station identification integer
-    error = nf90_def_var(ncid, 'STAids', nf90_int, id_obs, id_idsSTA)
-    call netcdf_err(error, 'defining STAids' )
+    error = nf90_def_var(ncid, 'stid', nf90_int, id_obs, id_idsSTA)
+    call netcdf_err(error, 'defining stid' )
     error = nf90_put_att(ncid, id_idsSTA, "long_name", "Station Identification")
-    call netcdf_err(error, 'defining STAids long name' )
+    call netcdf_err(error, 'defining stid long name' )
     error = nf90_put_att(ncid, id_idsSTA, "units", "-")
-    call netcdf_err(error, 'defining STAids units' )
+    call netcdf_err(error, 'defining stid units' )
 
     !--- define snow cover
     error = nf90_def_var(ncid, 'IMSscf', nf90_double, id_obs, id_scfIMS)
@@ -494,7 +470,7 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
     ! --- put lat, lon, data
 
     error = nf90_put_var(ncid, id_idsSTA, data_ids(:))
-    call netcdf_err(error, 'writing STAids record')
+    call netcdf_err(error, 'writing stid record')
 
     error = nf90_put_var(ncid, id_scfIMS, data_vec(1,:))
     call netcdf_err(error, 'writing IMSscf record')
