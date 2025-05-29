@@ -63,7 +63,12 @@ set( IMSPROC_LIBRARIES imsproc )
 #-------------------------------------------------------------------------------
 set ( exe_files ./sorc/driver_fIMS.f90 )
 
-ecbuild_add_executable( TARGET   calcfIMS.exe
+if(CMAKE_PROJECT_NAME)
+    set(target_name "${CMAKE_PROJECT_NAME}_calcfIMS.x")
+else()
+    set(target_name "calcfIMS.x")
+endif()
+ecbuild_add_executable( TARGET   ${target_name}
                         SOURCES  ${exe_files}
                         LIBS     imsproc
                         LINKER_LANGUAGE ${IMSPROC_LINKER_LANGUAGE}
