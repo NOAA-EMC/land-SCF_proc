@@ -51,20 +51,22 @@ contains
 ! as 0% for SCF < 50%.
 
 ! note on timing: files are once a day, nominally at 0 UTC. 
-subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, & 
-                            IMS_ind_path, fcst_path, lsm, imsformat, imsversion, imsres, skip_SD)
+subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_obs_path, & 
+           IMS_ind_path, fcst_path, fix_path, lsm, imsformat, imsversion, imsres, skip_SD)
                                                         
         implicit none
         
         integer, intent(in)             :: idim, jdim, lsm
         integer, intent(in)             :: imsformat
-        character(len=20), intent(in)   :: otype  
+        character(len=20), intent(in)   :: otype
+        character(len=20), intent(in)   :: oropfx
         character(len=11), intent(in)   :: yyyymmddhh
         character(len=7), intent(in)    :: jdate
-        character(len=*), intent(in)    :: IMS_obs_path, IMS_ind_path, fcst_path
+        character(len=*), intent(in)    :: IMS_obs_path, IMS_ind_path, fcst_path, fix_path
         logical, intent(in)             :: skip_SD
         character(len=10), intent(in)   :: imsversion, imsres 
 
+        real                :: landfrac(idim,jdim,6)    ! land cover fraction
         real                :: vtype(idim,jdim,6)       ! model vegetation type
         integer             :: landmask(idim,jdim,6)
         real                :: swefcs(idim,jdim,6), sndfcs(idim,jdim,6) ! forecast SWE, SND
@@ -86,12 +88,15 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
 !=============================================================================================
 
         if (.not. skip_SD) then
+            ! read in land cover fraction from the fix file
+            call read_landfrac(fix_path, oropfx, idim, jdim, landfrac)
+
             ! note: snow cover being read here is calculated at the start of the 
             !       time step, and does not account for snow changes over the last 
             !       time step. Resulting errors are generally very small.
+            
             call  read_fcst(fcst_path, yyyymmddhh, idim, jdim, vtype, swefcs,  & 
-                            sndfcs, stcfcs, landmask)
-
+                            sndfcs, stcfcs, landfrac, landmask)
             call calc_density(idim, jdim, lsm, landmask, swefcs, sndfcs, stcfcs, denfcs)
         endif 
 
@@ -452,14 +457,74 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
  end subroutine write_IMS_outputs_vec
 
 !====================================
+! read in land cover fraction from fixed origraphic files
+
+ subroutine read_landfrac(path, oropfx, idim, jdim, landfrac)
+
+        implicit none
+        character(len=20), intent(in)     :: oropfx
+        character(len=*), intent(in)      :: path
+        integer, intent(in)               :: idim, jdim
+        real, intent(out)                 :: landfrac(idim,jdim,6)
+
+        integer                   :: error, ncid, t
+        integer                   :: id_dim, id_var, idim_file
+        character                 :: tt
+        character(len=300)        :: fix_file
+
+        logical                   :: file_exists
+
+        do t =1,6
+            write(tt, "(i1)") t
+            fix_file = trim(path)//trim(oropfx)// &
+                                "_oro_data.tile"//tt//".nc"
+
+            print *, 'reading orographic fixfile:', trim(fix_file)
+
+            inquire(file=trim(fix_file), exist=file_exists)
+
+            if (.not. file_exists) then
+                    print *, 'read_fixfile error,file does not exist', &
+                            trim(fix_file) , ' exiting'
+                    stop 10
+            endif
+
+            error=nf90_open(trim(fix_file), nf90_nowrite,ncid)
+            call netcdf_err(error, 'opening file: '//trim(fix_file) )
+
+            ! check dimension
+            error=nf90_inq_dimid(ncid, 'lon', id_dim)
+            call netcdf_err(error, 'reading lon' )
+            error=nf90_inquire_dimension(ncid,id_dim,len=idim_file)
+            call netcdf_err(error, 'reading lon' )
+
+            if ((idim_file) /= idim) then
+                print*,'fatal error reading fcst file: dimensions wrong.'
+                stop 10
+            endif
+
+           ! land cover fraction
+            error=nf90_inq_varid(ncid, "land_frac", id_var)
+            call netcdf_err(error, 'reading land_frac id' )
+            error=nf90_get_var(ncid, id_var, landfrac)
+            call netcdf_err(error, 'reading landfrac' )
+  
+        error = nf90_close(ncid)
+
+    enddo
+
+ end subroutine read_landfrac
+
+!====================================
 ! read in required forecast fields from a UFS surface restart 
 
- subroutine read_fcst(path, date_str, idim, jdim, vetfcs, swefcs, sndfcs, stcfcs, landmask)
+ subroutine read_fcst(path, date_str, idim, jdim, vetfcs, swefcs, sndfcs, stcfcs, landfrac, landmask)
 
         implicit none
         character(len=*), intent(in)      :: path
-        character(11), intent(in)          :: date_str
+        character(11), intent(in)         :: date_str
         integer, intent(in)               :: idim, jdim
+        real, intent(in)                  :: landfrac(idim,jdim,6)
         real, intent(out)                 :: vetfcs(idim,jdim,6), swefcs(idim,jdim,6)
         real, intent(out)                 :: stcfcs(idim,jdim,6)
         real, intent(out)                 :: sndfcs(idim,jdim,6)
@@ -533,19 +598,10 @@ subroutine calculate_scfIMS(idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, 
             call netcdf_err(error, 'reading stc' )
             stcfcs(:,:,t) = dummy3(:,:,1) 
 
-            ! land mask
-            error=nf90_inq_varid(ncid, "slmsk", id_var)
-            call netcdf_err(error, 'reading slmsk id' )
-            error=nf90_get_var(ncid, id_var, dummy)
-            call netcdf_err(error, 'reading slmsk' )
-
-            ! slmsk in file is: 0 - ocean, 1 - land, 2 -seaice
-            ! convert to: integer with  0 - glacier or non-land, 1 - non-glacier covered land
-
             do i = 1, idim 
               do j = 1, jdim
-               ! if land, but not land ice, set mask to 1.
-               if ( (nint(dummy(i,j)) == 1 ) .and.   &
+               ! if land cover fraction >50%, but not land ice, set mask to 1.
+               if ( ( landfrac(i,j,t) > 0.5 ) .and. &
                     ( nint(vetfcs(i,j,t)) /=  veg_type_landice  )) then
                     landmask(i,j,t) = 1
                else

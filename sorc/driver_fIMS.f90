@@ -13,18 +13,20 @@
  integer             :: idim, jdim
  character(len=11)   :: yyyymmddhh
  character(len=7)    :: jdate
- character(len=20)   :: otype ! orography type, format C$RES (atm) or C${RES}.mx100 (coupled atm/ocean)
- character(len=200)  :: IMS_obs_path, IMS_ind_path, fcst_path
+ character(len=20)   :: otype ! orography type, format of IMS index files
+ character(len=20)   :: oropfx ! orography type, format C${RES}.mx100 (coupled atm/ocean)
+ character(len=200)  :: IMS_obs_path, IMS_ind_path, fcst_path, fix_path
  logical             :: file_exists, skip_SD
  integer             :: io, ierr, lsm, imsformat
  character(len=10)   :: imsversion, imsres
 
- namelist/fIMS_nml/  idim, jdim, otype, yyyymmddhh, jdate, IMS_obs_path, IMS_ind_path, fcst_path, lsm, imsformat, imsversion, imsres, skip_SD
+ namelist/fIMS_nml/  idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_obs_path, IMS_ind_path, fcst_path, lsm, imsformat, imsversion, imsres, skip_SD
 
  ! default to current directory 
  IMS_obs_path="./"
  IMS_ind_path="./"
  fcst_path="./"
+ fix_path="./"
 
  lsm=2 ! 1 - noah, 2 - noah-MP. 
  imsformat=2  ! 1 - ascii format, 2 - netCDF format
@@ -45,7 +47,7 @@
  close (io) 
  
  print *, 'lsm', lsm
- call calculate_scfIMS(idim, jdim, otype,yyyymmddhh, jdate,IMS_obs_path, IMS_ind_path, & 
-                                fcst_path, lsm, imsformat, imsversion, imsres, skip_SD)
+ call calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate,IMS_obs_path, IMS_ind_path, & 
+                       fcst_path, fix_path, lsm, imsformat, imsversion, imsres, skip_SD)
 
  end program driver_fIMS

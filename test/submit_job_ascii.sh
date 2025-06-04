@@ -9,9 +9,11 @@ DD=01
 HH=12
 
 RES=48
+ORES=100
 
 EXEC_DIR=../exec/bin/
 RESTART_DIR=/scratch2/BMC/gsienkf/Clara.Draper/DA_test_cases/land-IMSproc/restarts/
+FIXFILE_DIR=/scratch1/NCEPDEV/global/glopara/fix/orog/20231027
 
 ############# NO CHANGES NEEDED BELOW THIS LINE
 source ../env_GDASApp 
@@ -23,6 +25,9 @@ rm fims.nml
 fi
 if [ -e ${YYYY}${MM}${DD}.${HH}0000.sfc_data.tile1.nc ]; then 
 rm ${YYYY}${MM}${DD}.${HH}0000.sfc_data.tile*
+fi
+if [ -e C${RES}.mx${ORES}_oro_data.tile1.nc ]; then
+rm C${RES}.mx${ORES}_oro_data.tile*
 fi 
 if [ -e calcfIMS.exe ]; then 
 rm calcfIMS.exe
@@ -32,6 +37,7 @@ DOY=$(date -d "${YYYY}-${MM}-${DD}" +%j)
 JDATE=$YYYY$DOY
 
 TSTUB=oro_C${RES}
+OROPREFIX=C${RES}.mx${ORES}
 
 cat >> fims.nml << EOF
  &fIMS_nml
@@ -39,6 +45,7 @@ cat >> fims.nml << EOF
   jdim=$RES,
   jdate=$JDATE,
   otype=${TSTUB},
+  oropfx=${OROPREFIX},
   yyyymmddhh=${YYYY}${MM}${DD}.${HH},
   imsformat=1,
   imsversion=1.3,
@@ -53,6 +60,7 @@ EOF
 for tt in 1 2 3 4 5 6
 do 
 ln -s ${RESTART_DIR}/${YYYY}${MM}${DD}.${HH}0000.sfc_data.tile${tt}.nc .
+ln -s ${FIXFILE_DIR}/C${RES}/C${RES}.mx${ORES}_oro_data.tile${tt}.nc .
 done
 
 ln -s ${EXEC_DIR}/calcfIMS.exe .
