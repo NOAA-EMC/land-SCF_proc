@@ -81,7 +81,11 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
         real                :: oroFV3(idim,jdim,6) ! orography model grid
         character(len=250)  :: IMS_obs_file
         character(len=8)    :: date_from_file
-        integer             :: i,j,t
+        character(len=1)    :: tile_str
+        character(len=4)    :: xind, yind, jstr4,istr4
+        character(len=9)    :: stid(idim,jdim,6)   ! station ID string
+        integer             :: sid(idim,jdim,6)    ! station ID integer
+        integer             :: i,j,t,stationid
         integer             :: time
 !=============================================================================================
 ! 1. Read forecast info, and IMS data and indexes from file, then calculate SWE
@@ -158,7 +162,6 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
                     enddo 
                   enddo 
                 enddo
-
             else 
                 print *, 'unknown lsm:', lsm, ', choose 1 - noah, 2 - noah-mp' 
                 stop 10 
@@ -166,12 +169,32 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
         else 
                 sndIMS=nodata_real
         endif ! skip_SD
+        ! add station identification with txxxxyyyy string
+         do t=1,6
+           do i=1,idim
+             do j=1,jdim
+                write(tile_str, '(i1)') t ! assuming <10 tiles.
+                  ! create xindex string for final station identification
+                  write(istr4,'(i4.4)') i
+                  xind=istr4
+                  ! create yindex string for final station identification
+                  write(jstr4,'(i4.4)') j
+                  yind=jstr4
+
+                stid(i,j,t)=tile_str//xind//yind
+
+                ! convert string into integer
+                read(stid(i,j,t),'(i9)') stationid
+                sid(i,j,t)=stationid
+             enddo
+           enddo
+         enddo
 !=============================================================================================
 ! 2.  Write outputs
 !=============================================================================================
         
         !call write_IMS_outputs_2D(idim, jdim, scfIMS,sndIMS)
-        call write_IMS_outputs_vec(idim, jdim, otype, yyyymmddhh, scfIMS, sndIMS, lonFV3, latFV3, oroFV3, date_from_file, time)
+        call write_IMS_outputs_vec(idim, jdim, otype, yyyymmddhh, scfIMS, sndIMS, lonFV3, latFV3, oroFV3, sid, date_from_file, time)
 
         return
 
@@ -306,7 +329,7 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
 ! also writes out the model lat/lon for the grid cell that the data have been 
 ! processed onto.
 
- subroutine write_IMS_outputs_vec(idim, jdim, otype, date_str,scfIMS, sndIMS, lonFV3, latFV3, oroFV3, date_from_file, time)
+ subroutine write_IMS_outputs_vec(idim, jdim, otype, date_str,scfIMS, sndIMS, lonFV3, latFV3, oroFV3, sid, date_from_file, time)
 
     implicit none
     character(len=11), intent(in)  :: date_str
@@ -314,21 +337,24 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
     character(len=8), intent(in)   :: date_from_file
     integer, intent(in)            :: idim, jdim
     integer, intent(in)            :: time
-    real, intent(in)            :: scfIMS(idim,jdim,6)
-    real, intent(in)            :: sndIMS(idim,jdim,6)
-    real, intent(in)            :: latFV3(idim,jdim,6)
-    real, intent(in)            :: lonFV3(idim,jdim,6)
-    real, intent(in)            :: oroFV3(idim,jdim,6)
+    real, intent(in)               :: scfIMS(idim,jdim,6)
+    real, intent(in)               :: sndIMS(idim,jdim,6)
+    real, intent(in)               :: latFV3(idim,jdim,6)
+    real, intent(in)               :: lonFV3(idim,jdim,6)
+    real, intent(in)               :: oroFV3(idim,jdim,6)
 
-    character(len=250)          :: output_file
-    character(len=10)           :: time_char
-    integer                     :: header_buffer_val = 16384
-    integer                     :: dim_time, id_time
-    integer                     :: i,j,t,n, nobs
-    integer                     :: error, ncid
-    integer                     :: id_scfIMS, id_sndIMS , id_obs, id_lon, id_lat, id_oro
-    real, allocatable           :: data_vec(:,:)
-    real, allocatable           :: coor_vec(:,:)
+    character(len=250)             :: output_file
+    character(len=10)              :: time_char
+    integer                        :: header_buffer_val = 16384
+    integer                        :: dim_time, id_time
+    integer                        :: i,j,t,n, nobs
+    integer                        :: error, ncid
+    integer                        :: id_scfIMS, id_sndIMS, id_idsSTA, id_obs, id_lon, id_lat, id_oro
+    real, allocatable              :: data_vec(:,:)
+    real, allocatable              :: coor_vec(:,:)
+
+    integer, intent(in)           :: sid(idim,jdim,6)
+    integer, allocatable          :: data_ids(:)
  
     output_file = "./IMSscf."//date_str(1:8)//"."//trim(adjustl(otype))//".nc"
     print*,'writing output to ',trim(output_file) 
@@ -349,8 +375,9 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
     endif
 
     allocate(data_vec(2,nobs)) 
-    allocate(coor_vec(3,nobs)) 
-
+    allocate(coor_vec(3,nobs))
+    allocate(data_ids(nobs))
+ 
     !--- define spatial dimension
     error = nf90_def_dim(ncid, 'numobs', nobs, id_obs)
     call netcdf_err(error, 'defining obs dimension' )
@@ -395,6 +422,14 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
     error = nf90_put_att(ncid, id_oro, "long_name", "orography")
     call netcdf_err(error, 'defining oro long name' )
 
+    !--- define station identification integer
+    error = nf90_def_var(ncid, 'stid', nf90_int, id_obs, id_idsSTA)
+    call netcdf_err(error, 'defining stid' )
+    error = nf90_put_att(ncid, id_idsSTA, "long_name", "Station Identification")
+    call netcdf_err(error, 'defining stid long name' )
+    error = nf90_put_att(ncid, id_idsSTA, "units", "-")
+    call netcdf_err(error, 'defining stid units' )
+
     !--- define snow cover
     error = nf90_def_var(ncid, 'IMSscf', nf90_double, id_obs, id_scfIMS)
     call netcdf_err(error, 'defining IMSscf' )
@@ -411,11 +446,13 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
     error = nf90_put_att(ncid, id_sndIMS, "units", "mm")
     call netcdf_err(error, 'defining IMSsnd units' )
 
+
     error = nf90_enddef(ncid)
     call netcdf_err(error, 'defining header' )
 
     data_vec=nodata_real
     coor_vec=nodata_real
+    data_ids=nodata_int
 
     n=0
     do t=1,6
@@ -428,12 +465,16 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
                 coor_vec(1,n) = lonFV3(i,j,t)
                 coor_vec(2,n) = latFV3(i,j,t)
                 coor_vec(3,n) = oroFV3(i,j,t)
+                data_ids(n) = sid(i,j,t)
         endif
       enddo 
      enddo 
     enddo
-   
+
     ! --- put lat, lon, data
+
+    error = nf90_put_var(ncid, id_idsSTA, data_ids(:))
+    call netcdf_err(error, 'writing stid record')
 
     error = nf90_put_var(ncid, id_scfIMS, data_vec(1,:))
     call netcdf_err(error, 'writing IMSscf record')
@@ -453,6 +494,7 @@ subroutine calculate_scfIMS(idim, jdim, otype, oropfx, yyyymmddhh, jdate, IMS_ob
     error = nf90_close(ncid)
     deallocate(data_vec)
     deallocate(coor_vec)
+    deallocate(data_ids)
     
  end subroutine write_IMS_outputs_vec
 
